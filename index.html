@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PDF → Excel | Organisateur d'obstacles</title>
+<style>
+:root{color-scheme:light dark;--bg:#f5f7fb;--surface:#fff;--text:#172033;--muted:#657087;--line:#dce2ec;--accent:#2563eb;--accent2:#1d4ed8;--ok:#087443;--warn:#9a5b00}
+*{box-sizing:border-box} body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--text)}
+.app{min-height:100vh;padding:34px 20px}.shell{max-width:1120px;margin:auto}.hero{margin-bottom:22px}
+.eyebrow{font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+h1{font-size:30px;margin:7px 0}.sub{color:var(--muted);max-width:780px;line-height:1.55}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:22px;margin:16px 0;box-shadow:0 8px 24px #0000000b}
+.drop{border:2px dashed #aeb9ca;border-radius:14px;padding:34px;text-align:center;cursor:pointer;transition:.2s}
+.drop:hover,.drop.over{border-color:var(--accent);background:#2563eb08}.drop strong{display:block;font-size:18px;margin-bottom:7px}.drop span{color:var(--muted);font-size:14px}
+input[type=file]{display:none}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:15px}
+button{border:0;border-radius:10px;padding:11px 16px;font-weight:750;cursor:pointer}.primary{background:var(--accent);color:white}.primary:hover{background:var(--accent2)}
+.secondary{background:#e9eef7;color:#26344d}.secondary:disabled,.primary:disabled{opacity:.45;cursor:not-allowed}
+.status{margin-top:14px;color:var(--muted);font-size:14px}.status.ok{color:var(--ok);font-weight:700}.status.warn{color:var(--warn)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.stat{padding:14px;background:#f7f9fc;border:1px solid var(--line);border-radius:12px}.stat b{font-size:22px;display:block}.stat span{color:var(--muted);font-size:13px}
+.tablewrap{overflow:auto;border:1px solid var(--line);border-radius:12px} table{border-collapse:collapse;width:100%;font-size:13px}th,td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}th{background:#f1f4f9;font-size:12px}
+.note{font-size:13px;color:var(--muted);line-height:1.5}.rule{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.rule div{padding:13px;border:1px solid var(--line);border-radius:11px}
+@media(max-width:700px){.app{padding:22px 12px}h1{font-size:25px}.stats,.rule{grid-template-columns:1fr}}
+@media(prefers-color-scheme:dark){.stat,th{background:#182131}.secondary{background:#243047;color:#e9eef7}.drop{border-color:#526078}.sub,.note,.status,.stat span{color:#a9b5c8}}
+</style>
+</head>
+<body>
+<div class="app"><div class="shell">
+<section class="hero"><div class="eyebrow">Outil SNCF • PDF → Excel</div>
+<h1>Organisateur de la liste des obstacles</h1>
+<div class="sub">Déposez votre PDF. L’outil réorganise automatiquement les données, conserve les colonnes utiles, place les codes dans <b>ID</b>, supprime les éléments inutiles et génère un fichier Excel prêt à l’emploi.</div></section>
+<section class="card"><label class="drop" id="drop"><strong>📄 Déposer le PDF ici</strong><span>ou cliquez pour sélectionner un fichier PDF</span><input id="file" type="file" accept="application/pdf"></label>
+<div class="actions"><button class="primary" id="process" disabled>Traiter le PDF</button><button class="secondary" id="download" disabled>Télécharger Excel</button></div>
+<div id="status" class="status">Aucun PDF sélectionné.</div></section>
+<section class="card"><div class="stats"><div class="stat"><b id="nPages">—</b><span>pages</span></div><div class="stat"><b id="nRows">—</b><span>lignes conservées</span></div><div class="stat"><b id="nIds">—</b><span>codes ID détectés</span></div></div></section>
+<section class="card"><h2>Aperçu du résultat</h2><div class="tablewrap"><table><thead><tr><th>ID</th><th>Obstacle</th><th>Pk début</th><th>Pk fin</th><th>Relevé</th></tr></thead><tbody id="preview"><tr><td colspan="5" class="note">Le résultat apparaîtra ici.</td></tr></tbody></table></div></section>
+<section class="card"><h2>Règles appliquées</h2><div class="rule">
+<div><b>Colonnes supprimées</b><br><span class="note">Elect., En gare, Train TX, Voie, Sens, IPCS, les 2 colonnes de Désaxement, les 3 colonnes de Rayons et AG.</span></div>
+<div><b>Codes d’identification</b><br><span class="note">Les codes à 6 chiffres + 3 lettres sont placés exclusivement dans <b>ID</b>. S’ils apparaissent seuls, ils sont rattachés à la ligne immédiatement précédente. S’ils apparaissent sur la même ligne que l’obstacle, le code est retiré du texte de l’obstacle.</span></div>
+<div><b>Lignes vides</b><br><span class="note">Toute ligne sans aucune donnée est supprimée.</span></div>
+<div><b>Résultat propre</b><br><span class="note">Les lignes vides, en-têtes et pieds de page sont supprimés. Les pages sont fusionnées dans un seul tableau, sans lignes de séparation.</span></div>
+</div></section>
+</div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs" type="module"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script type="module">
+const fileInput=document.getElementById('file'),drop=document.getElementById('drop'),processBtn=document.getElementById('process'),downloadBtn=document.getElementById('download');
+const status=document.getElementById('status'),preview=document.getElementById('preview');let selectedFile=null,resultRows=[],pdfLib=null;
+async function loadPdfLib(){if(pdfLib)return pdfLib;pdfLib=await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs');pdfLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs';return pdfLib}
+function clean(s){return(s||'').replace(/\s+/g,' ').trim()}
+function isFov(s){return/^\d{6}[A-Z]{3}$/i.test(clean(s))}
+function nearestColumn(x){const centers=[108,196,243,282,313,344,389,432,462,505,548,586,621,661,712,772];let best=0,dist=Infinity;centers.forEach((c,i)=>{let d=Math.abs(x-c);if(d<dist){dist=d;best=i}});return best}
+async function extractPage(page){const tc=await page.getTextContent({disableCombineTextItems:false}),items=tc.items.filter(x=>clean(x.str)),groups=[];for(const it of items){const x=it.transform[4],y=it.transform[5];let g=groups.find(z=>Math.abs(z.y-y)<2.6);if(!g){g={y,items:[]};groups.push(g)}g.items.push({x,text:it.str})}groups.sort((a,b)=>b.y-a.y);return groups.map(g=>{g.items.sort((a,b)=>a.x-b.x);const cols=Array(16).fill('');for(const it of g.items){const c=nearestColumn(it.x);cols[c]=clean(cols[c]+' '+it.text)}return{cols,raw:g.items.map(x=>x.text).join(' '),y:g.y}})}
+function processRows(raw){const kept=[];for(const row of raw){const c=row.cols,nonEmpty=c.map(clean).filter(Boolean);if(nonEmpty.length===0)continue;if(/Page\s+\d+\s*\/\s*\d+/i.test(clean(row.raw))||nonEmpty.some(x=>/^Liste des obstacles de la ligne/i.test(x))||nonEmpty.includes('Obstacle')||nonEmpty.includes('Désaxement')||nonEmpty.includes('Rayons'))continue;const first=clean(c[0]);const codeMatch=first.match(/(?:^|\s)(\d{6}\s*[A-Z]{3})(?:\s|$)/i);const isolatedCode=nonEmpty.length===1&&isFov(nonEmpty[0])?nonEmpty[0]:(codeMatch?clean(codeMatch[1]).replace(/\s+/g,''):'');if(isolatedCode){if(nonEmpty.length===1){if(kept.length)kept[kept.length-1].ID=isolatedCode;else kept.push({ID:isolatedCode,Obstacle:'','Pk début':'','Pk fin':'',Relevé:''});continue}const obstacleWithoutCode=clean(first.replace(codeMatch[0],'')),dates=clean(row.raw).match(/\b\d{2}\/\d{2}\/\d{4}\b/g)||[],releve=dates.length?dates[dates.length-1]:clean(c[15]);kept.push({ID:isolatedCode,Obstacle:obstacleWithoutCode,'Pk début':clean(c[1]),'Pk fin':clean(c[2]),Relevé:releve});continue}if(nonEmpty.length===1)continue;const dates=clean(row.raw).match(/\b\d{2}\/\d{2}\/\d{4}\b/g)||[],releve=dates.length?dates[dates.length-1]:clean(c[15]);kept.push({ID:'',Obstacle:clean(c[0]),'Pk début':clean(c[1]),'Pk fin':clean(c[2]),Relevé:releve})}return kept.filter(r=>r.ID||r.Obstacle||r['Pk début']||r['Pk fin']||r.Relevé)}
+async function processPdf(file){const lib=await loadPdfLib(),buf=await file.arrayBuffer(),pdf=await lib.getDocument({data:buf}).promise,raw=[];for(let p=1;p<=pdf.numPages;p++){const page=await pdf.getPage(p);raw.push(...await extractPage(page))}return{rows:processRows(raw),pages:pdf.numPages}}
+function show(rows){preview.innerHTML='';rows.slice(0,50).forEach(r=>{const tr=document.createElement('tr');[r.ID,r.Obstacle,r['Pk début'],r['Pk fin'],r.Relevé].forEach(v=>{const td=document.createElement('td');td.textContent=v||'';tr.appendChild(td)});preview.appendChild(tr)});if(rows.length>50){const tr=document.createElement('tr');tr.innerHTML='<td colspan="5" class="note">Aperçu limité aux 50 premières lignes.</td>';preview.appendChild(tr)}}
+fileInput.addEventListener('change',()=>{selectedFile=fileInput.files[0]||null;processBtn.disabled=!selectedFile;status.textContent=selectedFile?selectedFile.name+' sélectionné.':'Aucun PDF sélectionné.'});
+['dragenter','dragover'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.add('over')}));['dragleave','drop'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.remove('over')}));drop.addEventListener('drop',ev=>{selectedFile=ev.dataTransfer.files[0]||null;fileInput.files=ev.dataTransfer.files;processBtn.disabled=!selectedFile;status.textContent=selectedFile?selectedFile.name+' sélectionné.':'Aucun PDF sélectionné.'});
+processBtn.addEventListener('click',async()=>{if(!selectedFile)return;processBtn.disabled=true;downloadBtn.disabled=true;status.className='status';status.textContent='Traitement du PDF…';try{const out=await processPdf(selectedFile);resultRows=out.rows;document.getElementById('nPages').textContent=out.pages;document.getElementById('nRows').textContent=resultRows.length;document.getElementById('nIds').textContent=resultRows.filter(r=>r.ID).length;show(resultRows);downloadBtn.disabled=!resultRows.length;status.className='status ok';status.textContent='✓ PDF traité avec succès.'}catch(e){console.error(e);status.className='status warn';status.textContent='Impossible de traiter ce PDF : '+e.message}finally{processBtn.disabled=false}});
+downloadBtn.addEventListener('click',()=>{if(!resultRows.length)return;const data=resultRows.map(r=>({ID:r.ID,Obstacle:r.Obstacle,'Pk début':r['Pk début'],'Pk fin':r['Pk fin'],Relevé:r.Relevé})),wb=XLSX.utils.book_new(),ws=XLSX.utils.json_to_sheet(data);ws['!cols']=[{wch:14},{wch:42},{wch:12},{wch:12},{wch:14}];XLSX.utils.book_append_sheet(wb,ws,'Obstacles');XLSX.writeFile(wb,'obstacles_organises.xlsx')});
+</script>
+</body>
+</html>
